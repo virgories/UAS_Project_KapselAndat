@@ -1,61 +1,41 @@
-# models.py
-from sqlalchemy import Column, Integer, String, Enum, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
 from database import Base
-import enum
-import datetime
+from sqlalchemy import Column, Integer, String, DateTime, Float # Tambahkan Float
 
-class UserRole(enum.Enum):
-    admin = "admin"
-    analyst = "analyst"
+class DataUAS(Base):
+    __tablename__ = "data_uas"
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    username = Column(String(150), unique=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), nullable=False)
+
+
+    # Kolom yang Memiliki Spasi/Kapital
+    # Perhatikan: Nama di database (string) HARUS SAMA PERSIS dengan di CSV
+    date = Column("Date", String(50)) 
+    item_id = Column("Item ID", String(50))
+    item_name = Column("Item Name", String(255))
+    category_name = Column("Category Name", String(255))
+    
+    current_stock = Column("Current Stock", Integer)
+    stock_awal = Column("Stock Awal", Integer)
+
+    # Kolom IN dan OUT (Sesuai dengan kasus terakhir yang error)
+    in_ = Column("IN", Integer)
+    out_ = Column("OUT", Integer)
+
+    target_stock = Column("Target Stock", Integer)
+
+    # Safety Stock memiliki tipe data Float (desimal) di CSV Anda
+    safety_stock = Column("Safety Stock", Float) 
+    
+    # Restock YES memiliki spasi
+    restock_yes = Column("Restock YES", String(10)) 
+    restock = Column(Integer)
+    
+    # Kolom ini bernama 'Transaction ID' di CSV Anda, BUKAN 'Restock_Transaction_ID'
+    transaction_id = Column("Transaction ID", String(50), primary_key=True) 
+
 
 class Category(Base):
     __tablename__ = "categories"
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String(512), nullable=True)
-
-    products = relationship("Product", back_populates="category")
-
-class Product(Base):
-    __tablename__ = "products"
-    id = Column(Integer, primary_key=True)
-
-    item_id = Column(String(100), unique=False, nullable=True)    # from "Item ID"
-    name = Column(String(255), nullable=False)                    # from "Item Name"
-    category_id = Column(Integer, ForeignKey("categories.id"))
-
-    current_stock = Column(Integer, default=0)
-    stock_awal = Column(Integer, default=0)
-    target_stock = Column(Integer, default=0)
-    safety_stock = Column(Integer, default=0)
-
-    category = relationship("Category", back_populates="products")
-    transactions = relationship("Transaction", back_populates="product")
-
-class TxType(enum.Enum):
-    IN = "IN"
-    OUT = "OUT"
-
-class Transaction(Base):
-    __tablename__ = "transactions"
-    id = Column(Integer, primary_key=True)
-
-    tx_id = Column(String(200), nullable=True)               # Transaction ID
-    product_id = Column(Integer, ForeignKey("products.id"))
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-
-    quantity = Column(Integer, nullable=False)
-    tx_type = Column(Enum(TxType), nullable=False)
-
-    restock_flag = Column(String(10), nullable=True)         # "Restock (YES/NO)"
-    restock_qty = Column(Integer, default=0)                 # "Restock"
-
-    product = relationship("Product", back_populates="transactions")
+    
+    # ... (Model Category tidak ada masalah)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(255), unique=True, index=True)
