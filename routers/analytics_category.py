@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from database import get_db
-import models
+from ..database import get_db
+from ..models import transaksi
 
 from schemas import (
     RestockFrequencyOut,
