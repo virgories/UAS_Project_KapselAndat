@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import func # Tambahkan func untuk membersihkan data
-import models, schemas
-from database import get_db
+import .models, schemas
+from .database import get_db
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
