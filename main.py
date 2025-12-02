@@ -20,4 +20,5 @@ seed_categories(db_session, models)
 app.include_router(categories.router)
 app.include_router(data_uas_router.router)
 app.include_router(transaction.router)   # CRUD transaksi
-app.include_router(analytics.router)    # Analytics
+app.include_router(analytics.router)  
+app.include_router(analytics_category.router)  # Analytics
