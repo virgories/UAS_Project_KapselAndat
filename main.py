@@ -1,10 +1,11 @@
+# main.py (di root folder UAS_Project_KapselAndat)
 from fastapi import FastAPI
-from database import init_db, SessionLocal, seed_categories
-import models
 
-from routers import categories, data_uas_router, transaction, analytics
+from .database import init_db, SessionLocal, seed_categories
+from . import models
+from .routers import categories, data_uas_router, transaction, analytics
 
-# bikin tabel kalau belum ada
+# bikin tabel
 init_db()
 
 app = FastAPI(
@@ -12,13 +13,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# seed kategori (kalau memang butuh)
 db_session = SessionLocal()
 seed_categories(db_session, models)
 
-# include SEMUA router
 app.include_router(categories.router)
 app.include_router(data_uas_router.router)
-app.include_router(transaction.router)   # CRUD transaksi
-app.include_router(analytics.router)  
-app.include_router(analytics_category.router)  # Analytics
+app.include_router(transaction.router)
+app.include_router(analytics.router)
