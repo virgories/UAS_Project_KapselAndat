@@ -1,3 +1,5 @@
-Project_UAS_KapselAndat/
-venv/
+.venv/
 __pycache__/
+*.pyc
+*.db
+.env
