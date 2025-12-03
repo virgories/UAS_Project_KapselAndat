@@ -3,7 +3,7 @@ from fastapi import FastAPI
 
 from .database import init_db, SessionLocal, seed_categories
 from . import models
-from .routers import categories, data_uas_router, transaction, analytics
+from .routers import categories, transaction, analytics
 
 # bikin tabel
 init_db()
@@ -17,6 +17,5 @@ db_session = SessionLocal()
 seed_categories(db_session, models)
 
 app.include_router(categories.router)
-app.include_router(data_uas_router.router)
 app.include_router(transaction.router)
 app.include_router(analytics.router)
