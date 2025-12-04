@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-
 from .database import init_db, SessionLocal, seed_categories
 from . import models
 from .routers import categories, data_uas_router, transaction, analytics
