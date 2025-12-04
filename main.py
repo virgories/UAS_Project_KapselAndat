@@ -1,9 +1,8 @@
 # main.py (di root folder UAS_Project_KapselAndat)
 from fastapi import FastAPI
-
 from .database import init_db, SessionLocal, seed_categories
 from . import models
-from .routers import categories, transaction, analytics
+from .routers import categories, data_uas_router, transaction, analytics
 
 # bikin tabel
 init_db()
