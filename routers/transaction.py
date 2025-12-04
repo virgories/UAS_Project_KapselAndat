@@ -1,87 +1,101 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+# Menggunakan impor relatif yang konsisten dari root directory
+from .. import models
+from .. import schemas
+from ..database import get_db 
 
-from ..database import get_db
-from ..models import Transaksi
-from ..schemas import TransactionCreate, TransactionUpdate, TransactionOut
+router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
-router = APIRouter(
-    prefix="/transactions",
-    tags=["Transactions"]
+
+# ----------------------------
+# POST new transaction (DataUAS) - CREATE
+# ----------------------------
+@router.post(
+    "/",
+    response_model=schemas.DataUASOut,
+    status_code=status.HTTP_201_CREATED
 )
-
-# CREATE
-@router.post("/", response_model=TransactionOut)
-def create_transaction(payload: TransactionCreate, db: Session = Depends(get_db)):
-    # kalau ID manual:
-    db_tx = Transaksi(
-        transaction_id=payload.transaction_id,
-        date=payload.date,
-        item_id=payload.item_id,
-        item_name=payload.item_name,
-        category_name=payload.category_name,
-        stock_current=payload.stock_current,
-        stock_awal=payload.stock_awal,
-        qty_in=payload.qty_in,
-        qty_out=payload.qty_out,
-        target_stock=payload.target_stock,
-        bulan=payload.bulan,
-    )
-    db.add(db_tx)
+def create_transaction(
+    transaction: schemas.DataUASCreate, # Menggunakan skema input yang benar
+    db: Session = Depends(get_db)
+):
+    # Buat objek model ORM dari skema Pydantic
+    # Menggunakan **transaction.model_dump() untuk memetakan semua field
+    db_transaction = models.DataUAS(**transaction.model_dump())
+    
+    db.add(db_transaction)
     db.commit()
-    db.refresh(db_tx)
-    return db_tx
+    db.refresh(db_transaction)
+    return db_transaction
 
 
-# READ all
-@router.get("/", response_model=list[TransactionOut])
-def get_transactions(db: Session = Depends(get_db)):
-    return db.query(Transaksi).all()
+# ----------------------------
+# GET all transactions (DataUAS) - READ all
+# ----------------------------
+@router.get("/", response_model=list[schemas.DataUASOut])
+def get_all_transactions(db: Session = Depends(get_db)):
+    return db.query(models.DataUAS).all()
 
 
-# READ by id
-@router.get("/{transaction_id}", response_model=TransactionOut)
-def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
-    tx = db.query(Transaksi).filter(Transaksi.transaction_id == transaction_id).first()
+# ----------------------------
+# GET transaction by ID - READ by id
+# ----------------------------
+@router.get("/{transaction_id}", response_model=schemas.DataUASOut)
+def get_transaction(transaction_id: str, db: Session = Depends(get_db)): # ID harus str
+    tx = db.query(models.DataUAS).filter(
+        models.DataUAS.transaction_id == transaction_id
+    ).first()
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return tx
 
 
-# UPDATE
-@router.put("/{transaction_id}", response_model=TransactionOut)
+# ----------------------------
+# PUT update transaction (Full Update)
+# ----------------------------
+@router.put(
+    "/{transaction_id}",
+    response_model=schemas.DataUASOut,
+    status_code=status.HTTP_200_OK
+)
 def update_transaction(
-    transaction_id: int,
-    payload: TransactionUpdate,
+    transaction_id: str, # ID harus str
+    transaction: schemas.DataUASCreate, # Menggunakan skema input yang benar
     db: Session = Depends(get_db)
 ):
-    tx = db.query(Transaksi).filter(Transaksi.transaction_id == transaction_id).first()
+    tx = db.query(models.DataUAS).filter(
+        models.DataUAS.transaction_id == transaction_id
+    ).first()
+
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    tx.date = payload.date
-    tx.item_id = payload.item_id
-    tx.item_name = payload.item_name
-    tx.category_name = payload.category_name
-    tx.stock_current = payload.stock_current
-    tx.stock_awal = payload.stock_awal
-    tx.qty_in = payload.qty_in
-    tx.qty_out = payload.qty_out
-    tx.target_stock = payload.target_stock
-    tx.bulan = payload.bulan
+    # Ambil data baru dari skema Pydantic
+    update_data = transaction.model_dump(exclude_unset=True)
+
+    # Perbarui semua atribut model ORM
+    for key, value in update_data.items():
+        setattr(tx, key, value)
 
     db.commit()
     db.refresh(tx)
     return tx
 
 
-# DELETE
-@router.delete("/{transaction_id}")
-def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
-    tx = db.query(Transaksi).filter(Transaksi.transaction_id == transaction_id).first()
+# ----------------------------
+# DELETE transaction by ID
+# ----------------------------
+@router.delete("/{transaction_id}", status_code=status.HTTP_200_OK)
+def delete_transaction(transaction_id: str, db: Session = Depends(get_db)): # ID harus str
+    tx = db.query(models.DataUAS).filter(
+        models.DataUAS.transaction_id == transaction_id
+    ).first()
+
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     db.delete(tx)
     db.commit()
-    return {"detail": "Transaction deleted"}
+    return {"status": "success", "message": "Transaction deleted"}

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, RootModel
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+from datetime import date
+from decimal import Decimal
 
 
 # ---------------------------------------------------------
@@ -17,37 +19,47 @@ class CategoryOut(BaseModel):
 
 
 # ---------------------------------------------------------
-# DATA UAS OUTPUT SCHEMA
+# DATA UAS INPUT/OUTPUT SCHEMA
 # ---------------------------------------------------------
-class DataUASOut(BaseModel):
-    date: str
+class DataUASCreate(BaseModel):
+    # Field input (sesuai dengan atribut Python di models.py)
+    transaction_id: str
+    date: str 
     item_id: str
     item_name: str
     category_name: str
     current_stock: int
     stock_awal: int
-    in_: int
-    out_: int
+    in_: int 
+    out_: int 
     target_stock: int
-    safety_stock: float
+    safety_stock: float 
     restock_yes: str
     restock: int
-    transaction_id: Optional[str]
 
-    model_config = {"from_attributes": True}
+
+class DataUASOut(DataUASCreate):
+    # Output schema mewarisi semua field dari input
+    # Hanya tambahkan field yang mungkin dibuat atau diubah tipenya oleh database.
+    
+    # model_config ini WAJIB untuk membaca objek ORM SQLAlchemy
+    model_config = {"from_attributes": True} 
 
 
 # ---------------------------------------------------------
-# ANALYTICS SCHEMAS (Wajib Ada)
+# ANALYTICS SCHEMAS
 # ---------------------------------------------------------
 
 class RestockFrequencyOut(RootModel):
+    # Struktur: {YYYY-MM: {category_name: frequency}}
     root: Dict[str, Dict[str, int]]
 
 
 class OutTrendOut(RootModel):
+    # Struktur: {category_name: {YYYY-MM: total_out}}
     root: Dict[str, Dict[str, int]]
 
 
 class TurnoverRatioOut(RootModel):
+    # Struktur: {category_name: rasio (float atau None)}
     root: Dict[str, Optional[float]]

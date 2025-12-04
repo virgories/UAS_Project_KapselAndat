@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
-from sqlalchemy import func # Tambahkan func untuk membersihkan data
-import models, schemas
-from database import get_db
+from sqlalchemy import func # Diperlukan untuk pembersihan nama kategori (lower, trim)
+# KOREKSI KRITIS: Mengubah import absolut ke import relatif 
+# untuk memastikan Python menemukan model di root directory.
+from .. import models 
+from .. import schemas # Import schemas secara modular
+from ..database import get_db # KOREKSI: Diubah dari 'from database' menjadi 'from ..database'
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
@@ -24,12 +27,12 @@ def require_admin(role: str = Header(None, alias="X-User-Role")):
 # ----------------------------
 @router.get("/", response_model=list[schemas.CategoryOut])
 def get_all_categories(db: Session = Depends(get_db)):
-    # Data sudah dibersihkan oleh seed_categories() saat startup
+    # Kategori sudah diisi (seeded) dengan nama bersih saat startup.
     return db.query(models.Category).all()
 
 
 # ----------------------------
-# CREATE category (Admin only) - DIKOREKSI
+# CREATE category (Admin only) 
 # ----------------------------
 @router.post(
     "/", 
@@ -41,7 +44,7 @@ def create_category(
     db: Session = Depends(get_db),
     role: str = Depends(require_admin)
 ):
-    # KOREKSI KRITIS: Membersihkan nama kategori sebelum disimpan
+    # KOREKSI KRITIS: Membersihkan nama kategori sebelum disimpan (sinkronisasi)
     cleaned_name = category.name.strip().lower()
 
     # Cek apakah kategori sudah ada (untuk mencegah duplikasi)
@@ -56,7 +59,7 @@ def create_category(
 
 
 # ----------------------------
-# UPDATE category by name (Admin only) - DIKOREKSI
+# UPDATE category by name (Admin only) 
 # ----------------------------
 @router.put(
     "/{category_name}",
@@ -88,7 +91,7 @@ def update_category(
 
 
 # ----------------------------
-# DELETE category by name (Admin only) - DIKOREKSI
+# DELETE category by name (Admin only) 
 # ----------------------------
 @router.delete(
     "/{category_name}",
