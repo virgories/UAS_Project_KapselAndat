@@ -1,19 +1,19 @@
 from fastapi import FastAPI
-from backend.db import engine, Base, init_db
-from backend.models import *
-from backend.routers import categories, items, transactions, auth_router, analytics
+from .database import init_db, SessionLocal, seed_categories
+from . import models
+from .routers import categories, data_uas_router, transaction, analytics
 
-app = FastAPI()
-
-# Buat tabel ketika app start
+# bikin tabel
 init_db()
 
-# Router
-app.include_router(auth_router.router)
-app.include_router(categories.router)
-app.include_router(items.router)
-app.include_router(transactions.router)
+app = FastAPI(
+    title="Warehouse Management API",
+    version="1.0.0"
+)
 
-@app.get("/")
-def home():
-    return {"message": "API is running"}
+db_session = SessionLocal()
+seed_categories(db_session, models)
+
+app.include_router(categories.router)
+app.include_router(transaction.router)
+app.include_router(analytics.router)
