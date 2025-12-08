@@ -1,9 +1,13 @@
 from fastapi import FastAPI, HTTPException, Depends
 from .models import Barang, BarangInput, BarangUpdate
 from . import crud
-
+from .routers import categories, transaction, analytics
 
 app = FastAPI(title="Warehouse Barang API")
+
+app.include_router(categories.router)
+app.include_router(transaction.router)
+app.include_router(analytics.router)
 
 def check_role(role: str):
     if role != "admin":
