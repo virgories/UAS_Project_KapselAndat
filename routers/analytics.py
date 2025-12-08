@@ -129,28 +129,33 @@ def trend_out_per_bulan(db: Session = Depends(get_db)):
 # ---------------------------------------------------------
 # 4. Turnover Ratio (OUT / Rata-rata Stok)
 # ---------------------------------------------------------
-@router.get("/turnover-ratio", response_model=Dict)
+@router.get("/turnover-ratio")
 def turnover_ratio(db: Session = Depends(get_db)):
+    # total barang keluar (OUT) dari semua transaksi
     total_out = float(
         db.query(func.sum(models.Transaction.qty_out)).scalar() or 0
     )
 
+    # ambil stok awal & stok current per item
     sub = (
         db.query(
-            models.Transaction.item_id,
-            models.Transaction.stock_awal,
-            models.Transaction.stock_current,
+            models.Transaction.item_id.label("item_id"),
+            func.min(models.Transaction.stock_awal).label("stock_awal"),
+            func.max(models.Transaction.stock_current).label("stock_current"),
         )
         .group_by(models.Transaction.item_id)
         .subquery()
     )
 
+    # rata-rata stok per item = (stok awal + stok current) / 2
     avg_stock_expr = (sub.c.stock_awal + sub.c.stock_current) / 2.0
+
+    # total rata-rata stok semua item
     total_avg_stock = float(
         db.query(func.sum(avg_stock_expr)).scalar() or 0
     )
 
-    turnover = total_out / total_avg_stock if total_avg_stock else None
+    turnover = total_out / total_avg_stock if total_avg_stock > 0 else None
 
     return {
         "total_out": total_out,
