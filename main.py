@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from .models import Barang, BarangInput, BarangUpdate
-import crud
+from . import crud
 
 
 app = FastAPI(title="Warehouse Barang API")
