@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends
-from models import Barang, BarangInput, BarangUpdate
+from .models import Barang, BarangInput, BarangUpdate
 import crud
 
 
