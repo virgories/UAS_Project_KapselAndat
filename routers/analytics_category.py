@@ -2,21 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from ..database import get_db
-from ..models import transaksi
-
-from schemas import (
-    RestockFrequencyOut,
-    OutTrendOut,
-    TurnoverRatioOut,
-)
-
+from .. import models, schemas
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
 # ---------------------------------------------------------
 # 1. Frekuensi Restock (Per Bulan, Per Kategori)
 # ---------------------------------------------------------
-@router.get("/restock-frequency", response_model=RestockFrequencyOut)
+@router.get("/restock-frequency", response_model=list[schemas.RestockFrequencyOut])
 def restock_frequency(db: Session = Depends(get_db)):
     rows = (
         db.query(
@@ -44,7 +37,7 @@ def restock_frequency(db: Session = Depends(get_db)):
 # ---------------------------------------------------------
 # 2. OUT Trend (Total Barang Keluar Per Bulan, Per Kategori)
 # ---------------------------------------------------------
-@router.get("/out-trend", response_model=OutTrendOut)
+@router.get("/out-trend", response_model=list[schemas.OutTrendOut])
 def out_trend(db: Session = Depends(get_db)):
     rows = (
         db.query(
@@ -70,7 +63,7 @@ def out_trend(db: Session = Depends(get_db)):
 # ---------------------------------------------------------
 # 3. Turnover Ratio (Total OUT / Total IN Per Kategori)
 # ---------------------------------------------------------
-@router.get("/turnover-ratio", response_model=TurnoverRatioOut)
+@router.get("/turnover-ratio", response_model=list[schemas.TurnoverRatioOut])
 def turnover_ratio(db: Session = Depends(get_db)):
     rows = (
         db.query(

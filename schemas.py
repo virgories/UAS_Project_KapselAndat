@@ -1,7 +1,5 @@
 from pydantic import BaseModel, RootModel
-from typing import Dict, Optional, List
-from datetime import date
-from decimal import Decimal
+from typing import Dict, Optional
 
 
 # ---------------------------------------------------------
@@ -17,49 +15,91 @@ class CategoryOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+# ==== ITEM / BARANG SCHEMAS ==== #
+
+class ItemBase(BaseModel):
+    item_code: str
+    item_name: str
+    category_name: Optional[str] = None
+
+class ItemCreate(ItemBase):
+    pass
+
+class ItemUpdate(BaseModel):
+    item_name: Optional[str] = None
+    category_name: Optional[str] = None
+
+class ItemOut(ItemBase):
+    id: int
+
+    model_config = {"from_attributes": True}
 
 # ---------------------------------------------------------
-# DATA UAS INPUT/OUTPUT SCHEMA
+# TRANSACTION SCHEMAS (untuk CRUD)
 # ---------------------------------------------------------
-class DataUASCreate(BaseModel):
-    # Field input (sesuai dengan atribut Python di models.py)
+class TransactionBase(BaseModel):
+    date: str
+    item_id: str
+    item_name: str
+    category_name: str
+
+    stock_awal: Optional[int] = None
+    stock_current: Optional[int] = None
+
+    qty_in: Optional[int] = 0
+    qty_out: Optional[int] = 0
+
+    target_stock: Optional[int] = None
+    safety_stock: Optional[float] = None
+    restock_flag: Optional[str] = None
+    restock: Optional[int] = None
+
+    bulan: Optional[str] = None
+
+class TransactionCreate(TransactionBase):
+    # contoh: "TXR592898"
     transaction_id: str
-    date: str 
+
+
+class TransactionUpdate(TransactionBase):
+    pass
+
+
+class TransactionOut(TransactionBase):
+    transaction_id: str
+
+    model_config = {"from_attributes": True}
+
+
+class DataUASOut(BaseModel):
+    date: str
     item_id: str
     item_name: str
     category_name: str
     current_stock: int
     stock_awal: int
-    in_: int 
-    out_: int 
+    in_: int
+    out_: int
     target_stock: int
-    safety_stock: float 
+    safety_stock: float
     restock_yes: str
     restock: int
+    transaction_id: Optional[str]
 
-
-class DataUASOut(DataUASCreate):
-    # Output schema mewarisi semua field dari input
-    # Hanya tambahkan field yang mungkin dibuat atau diubah tipenya oleh database.
-    
-    # model_config ini WAJIB untuk membaca objek ORM SQLAlchemy
-    model_config = {"from_attributes": True} 
+    model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------
-# ANALYTICS SCHEMAS
+# ANALYTICS SCHEMAS (Wajib Ada)
 # ---------------------------------------------------------
 
 class RestockFrequencyOut(RootModel):
-    # Struktur: {YYYY-MM: {category_name: frequency}}
     root: Dict[str, Dict[str, int]]
 
 
 class OutTrendOut(RootModel):
-    # Struktur: {category_name: {YYYY-MM: total_out}}
     root: Dict[str, Dict[str, int]]
 
 
 class TurnoverRatioOut(RootModel):
-    # Struktur: {category_name: rasio (float atau None)}
     root: Dict[str, Optional[float]]
