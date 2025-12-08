@@ -51,7 +51,7 @@ def create_barang_auto(data: dict):
 
 
     item_id = data["Item_ID"]
-    out_val = data["OUT"]
+    out_val = int(data["OUT"])
     date_str = data["Date"]
 
 
@@ -67,9 +67,15 @@ def create_barang_auto(data: dict):
         item_name = f"Item {item_id}"
         category_name = "Category"
 
+    if not df_item.empty:
+        last_in_val = int(df_item.iloc[-1]["Restock_Amount"])
+    else:
+        last_in_val = 0
+
+    in_val = last_in_val
 
     # Hitung Current Stock
-    current_stock = max(stock_awal - out_val, 0)
+    current_stock = max(stock_awal + in_val - out_val, 0)
 
 
     # Target stock
@@ -86,19 +92,7 @@ def create_barang_auto(data: dict):
 
     # Restock Amount
     restock_amount = target_stock - current_stock if restock_status == "YES" else 0
-
-
-    # Ambil last restock_amount dari item ini
-    last_restock = df_item[df_item["Restock_Status"]=="YES"]
-    if not last_restock.empty:
-        last_in_val = int(last_restock.iloc[-1]["Restock_Amount"])
-    else:
-        last_in_val = 0
-
-
-    # IN = restock_amount jika restock sekarang, else ambil last_in_val
-    in_val = restock_amount if restock_status == "YES" else 0
-
+    
 
     # Transaction_ID unik
     existing_txr = set(df["Transaction_ID"].tolist())
@@ -183,7 +177,8 @@ def update_transaction(transaction_id: str, update_data: dict):
         row = df.loc[idx[-1]]
         stock_awal = int(row["Stock_Awal"])
         out_val = int(row["OUT"])
-        current_stock = max(stock_awal - out_val, 0)
+        in_val = int(row["IN"])
+        current_stock = max(stock_awal + in_val - out_val, 0)
         target_stock = 500
         safety_stock = out_val / 2
         restock_status = "YES" if current_stock < safety_stock else "NO"
@@ -194,7 +189,7 @@ def update_transaction(transaction_id: str, update_data: dict):
         df.loc[idx, "Safety_Stock"] = safety_stock
         df.loc[idx, "Restock_Status"] = restock_status
         df.loc[idx, "Restock_Amount"] = restock_amount
-        df.loc[idx, "IN"] = restock_amount if restock_status == "YES" else 0
+        df.loc[idx, "IN"] = restock_amount if restock_status == "YES" else in_val
 
 
         save_data(df)
