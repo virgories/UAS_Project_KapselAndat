@@ -54,7 +54,7 @@ class TransactionBase(BaseModel):
     restock_flag: Optional[str] = None
     restock: Optional[int] = None
 
-    bulan: Optional[str] = None
+    bulan: str | None = None
 
 class TransactionCreate(TransactionBase):
     # contoh: "TXR592898"

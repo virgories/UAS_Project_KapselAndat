@@ -12,13 +12,19 @@ router = APIRouter(
     prefix="/analytics",
     tags=["Analytics"]
 )
+def parse_date_str(d: str) -> date | None:
+    for fmt in ("%Y-%m-%d", "%m/%d/%y", "%d/%m/%y"):
+        try:
+            return datetime.strptime(d, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 # ---------------------------------------------------------
 # 1. Rata-rata frekuensi transaksi setiap barang per hari
 # ---------------------------------------------------------
 @router.get("/avg-frequency", response_model=List[Dict])
 def avg_frequency_per_item(db: Session = Depends(get_db)):
-    # Hitung berapa banyak hari unik yang punya transaksi
     total_days = db.query(
         func.count(func.distinct(models.Transaction.date))
     ).scalar() or 1
@@ -27,7 +33,7 @@ def avg_frequency_per_item(db: Session = Depends(get_db)):
         db.query(
             models.Transaction.item_id,
             models.Transaction.item_name,
-            func.count(models.Transaction.transaction_id).label("total_transaksi")
+            func.count(models.Transaction.transaction_id).label("total_transaksi"),
         )
         .filter(
             (models.Transaction.qty_in > 0) |
@@ -40,12 +46,14 @@ def avg_frequency_per_item(db: Session = Depends(get_db)):
     data = []
     for r in rows:
         avg_freq = r.total_transaksi / total_days if total_days > 0 else 0
-        data.append({
-            "item_id": r.item_id,
-            "item_name": r.item_name,
-            "total_transaksi": r.total_transaksi,
-            "avg_transaksi_per_hari": avg_freq
-        })
+        data.append(
+            {
+                "item_id": r.item_id,
+                "item_name": r.item_name,
+                "total_transaksi": r.total_transaksi,
+                "avg_transaksi_per_hari": avg_freq,
+            }
+        )
 
     return data
 
@@ -66,64 +74,79 @@ def avg_restock_time(db: Session = Depends(get_db)):
         .all()
     )
 
-    per_item = defaultdict(list)
-    for r in rows:
-        per_item[(r.item_id, r.item_name)].append(r.date)
+    # group hanya per item_id
+    per_item_dates: dict[str, list[str]] = defaultdict(list)
+    per_item_name: dict[str, str] = {}
 
-    data = []
-    for (item_id, item_name), date_strs in per_item.items():
-        # coba parse tanggal "1/1/24" dst
+    for r in rows:
+        if r.item_id not in per_item_name:
+            # simpan nama pertama yang ketemu (boleh juga dibikin .title() / .lower())
+            per_item_name[r.item_id] = r.item_name
+        per_item_dates[r.item_id].append(r.date)
+
+    data: List[Dict] = []
+
+    for item_id, date_strs in per_item_dates.items():
         parsed_dates: List[date] = []
         for d in date_strs:
-            try:
-                # sesuaikan kalau format CSV-mu beda
-                parsed_dates.append(datetime.strptime(d, "%m/%d/%y").date())
-            except ValueError:
-                try:
-                    parsed_dates.append(datetime.strptime(d, "%d/%m/%y").date())
-                except ValueError:
-                    # kalau tetep nggak bisa, skip tanggal ini
-                    continue
+            parsed = parse_date_str(d)
+            if parsed is not None:
+                parsed_dates.append(parsed)
 
+        # kalau restock cuma 0–1 kali, SKIP aja (jangan tampil)
         if len(parsed_dates) < 2:
-            avg_days = None
-        else:
-            parsed_dates.sort()
-            diffs = [
-                (parsed_dates[i] - parsed_dates[i - 1]).days
-                for i in range(1, len(parsed_dates))
-            ]
-            avg_days = sum(diffs) / len(diffs) if diffs else None
+            continue
 
-        data.append({
-            "item_id": item_id,
-            "item_name": item_name,
-            "avg_restock_days": avg_days
-        })
+        parsed_dates.sort()
+        diffs = [
+            (parsed_dates[i] - parsed_dates[i - 1]).days
+            for i in range(1, len(parsed_dates))
+        ]
+        avg_days = sum(diffs) / len(diffs) if diffs else None
+
+        data.append(
+            {
+                "item_id": item_id,
+                "item_name": per_item_name[item_id],
+                "avg_restock_days": avg_days,
+            }
+        )
 
     return data
-
 
 # ---------------------------------------------------------
 # 3. Tren jumlah barang keluar per bulan
 # ---------------------------------------------------------
 @router.get("/trend-out", response_model=List[Dict])
 def trend_out_per_bulan(db: Session = Depends(get_db)):
-    # kamu sudah punya kolom "Bulan" di tabel → pakai itu saja
+    # kolom "Bulan" sudah tidak ada → hitung bulan dari Date
     rows = (
         db.query(
-            models.Transaction.bulan.label("bulan"),
-            func.sum(models.Transaction.qty_out).label("total_out")
+            models.Transaction.date,
+            models.Transaction.qty_out,
         )
-        .group_by(models.Transaction.bulan)
-        .order_by(models.Transaction.bulan)
+        .filter(models.Transaction.qty_out > 0)
         .all()
     )
 
-    return [
-        {"bulan": r.bulan, "total_out": r.total_out}
-        for r in rows
+    per_bulan: dict[str, int] = defaultdict(int)
+
+    for r in rows:
+        dt = parse_date_str(r.date)
+        if dt is None:
+            continue
+        label = dt.strftime("%b-%Y")  # contoh: "Jan-2024"
+        per_bulan[label] += r.qty_out or 0
+
+    # sort by bulan (pakai parsing ulang label)
+    hasil = [
+        {"bulan": k, "total_out": v}
+        for k, v in sorted(
+            per_bulan.items(),
+            key=lambda kv: datetime.strptime(kv[0], "%b-%Y")
+        )
     ]
+    return hasil
 
 
 # ---------------------------------------------------------
@@ -131,12 +154,10 @@ def trend_out_per_bulan(db: Session = Depends(get_db)):
 # ---------------------------------------------------------
 @router.get("/turnover-ratio")
 def turnover_ratio(db: Session = Depends(get_db)):
-    # total barang keluar (OUT) dari semua transaksi
     total_out = float(
         db.query(func.sum(models.Transaction.qty_out)).scalar() or 0
     )
 
-    # ambil stok awal & stok current per item
     sub = (
         db.query(
             models.Transaction.item_id.label("item_id"),
@@ -147,10 +168,8 @@ def turnover_ratio(db: Session = Depends(get_db)):
         .subquery()
     )
 
-    # rata-rata stok per item = (stok awal + stok current) / 2
     avg_stock_expr = (sub.c.stock_awal + sub.c.stock_current) / 2.0
 
-    # total rata-rata stok semua item
     total_avg_stock = float(
         db.query(func.sum(avg_stock_expr)).scalar() or 0
     )
@@ -207,19 +226,13 @@ def restock_forecast(
     if not rows:
         return {"item_id": item_id, "message": "Data tidak ditemukan"}
 
-    # parse tanggal
     parsed_dates: List[date] = []
     total_out = 0
 
     for r in rows:
-        try:
-            d = datetime.strptime(r.date, "%m/%d/%y").date()
-        except ValueError:
-            try:
-                d = datetime.strptime(r.date, "%d/%m/%y").date()
-            except ValueError:
-                continue
-
+        d = parse_date_str(r.date)
+        if d is None:
+            continue
         parsed_dates.append(d)
         total_out += r.qty_out or 0
 

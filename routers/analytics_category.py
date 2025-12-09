@@ -1,93 +1,72 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from typing import List, Dict
+
 from ..database import get_db
-from .. import models, schemas
-router = APIRouter(prefix="/analytics", tags=["Analytics"])
+from .. import models
 
-
-# ---------------------------------------------------------
-# 1. Frekuensi Restock (Per Bulan, Per Kategori)
-# ---------------------------------------------------------
-@router.get("/restock-frequency", response_model=list[schemas.RestockFrequencyOut])
-def restock_frequency(db: Session = Depends(get_db)):
-    rows = (
-        db.query(
-            # Menggunakan func.substr untuk mengambil YYYY-MM dari kolom Date (String)
-            func.substr(models.DataUAS.date, 1, 7).label("month"), 
-            models.DataUAS.category_name,
-            # Menghitung jumlah entri Restock 'YES' per group
-            func.count(models.DataUAS.restock_yes).label("frequency")
-        )
-        .filter(models.DataUAS.restock_yes == "YES")
-        .group_by("month", models.DataUAS.category_name)
-        .order_by("month")
-        .all()
-    )
-
-    # Memformat hasil ke dalam dictionary {month: {category: frequency}}
-    result = {}
-    for month, category, frequency in rows:
-        result.setdefault(month, {})
-        result[month][category] = frequency
-
-    return RestockFrequencyOut(root=result)
-
+router = APIRouter(
+    prefix="/analytics",
+    tags=["Analytics Category"],
+)
 
 # ---------------------------------------------------------
-# 2. OUT Trend (Total Barang Keluar Per Bulan, Per Kategori)
+# OUT TREND PER KATEGORI PER BULAN
 # ---------------------------------------------------------
-@router.get("/out-trend", response_model=list[schemas.OutTrendOut])
+@router.get("/out-trend", response_model=List[Dict])
 def out_trend(db: Session = Depends(get_db)):
+    """
+    Tren total OUT per kategori per bulan.
+    Bulan diambil dari kolom Date ('2024-01-01' -> '2024-01').
+    """
     rows = (
         db.query(
-            func.substr(models.DataUAS.date, 1, 7).label("month"),
-            models.DataUAS.category_name,
-            # Menggunakan func.sum untuk menjumlahkan barang keluar di database
-            func.sum(models.DataUAS.out_).label("total_out")
+            models.Transaction.category_name.label("category"),
+            # ambil 'YYYY-MM' dari 'YYYY-MM-DD'
+            func.substr(models.Transaction.date, 1, 7).label("month"),
+            func.sum(models.Transaction.qty_out).label("total_out"),
         )
-        .group_by("month", models.DataUAS.category_name)
-        .order_by("month")
+        .filter(models.Transaction.qty_out > 0)
+        .group_by("category", "month")
+        .order_by("category", "month")
         .all()
     )
 
-    # Memformat hasil ke dalam dictionary {category: {month: total_out}}
-    trend = {}
-    for month, category, total_out in rows:
-        trend.setdefault(category, {})
-        trend[category][month] = total_out
-
-    return OutTrendOut(root=trend)
+    return [
+        {
+            "category": r.category,
+            "month": r.month,
+            "total_out": r.total_out,
+        }
+        for r in rows
+    ]
 
 
 # ---------------------------------------------------------
-# 3. Turnover Ratio (Total OUT / Total IN Per Kategori)
+# RESTOCK FREQUENCY PER KATEGORI
 # ---------------------------------------------------------
-@router.get("/turnover-ratio", response_model=list[schemas.TurnoverRatioOut])
-def turnover_ratio(db: Session = Depends(get_db)):
+@router.get("/restock-frequency", response_model=List[Dict])
+def restock_frequency(db: Session = Depends(get_db)):
+    """
+    Frekuensi restock per kategori.
+    Hitung berapa banyak transaksi yang punya restock_flag = 'YES'.
+    """
     rows = (
         db.query(
-            models.DataUAS.category_name,
-            # Menjumlahkan total IN
-            func.sum(models.DataUAS.in_).label("total_in"),
-            # Menjumlahkan total OUT
-            func.sum(models.DataUAS.out_).label("total_out")
+            models.Transaction.category_name.label("category"),
+            func.count(models.Transaction.transaction_id).label("restock_count"),
         )
-        # Kelompokkan hanya berdasarkan nama kategori
-        .group_by(models.DataUAS.category_name)
+        .filter(models.Transaction.restock_flag == "YES")
+        .group_by(models.Transaction.category_name)
+        .order_by(models.Transaction.category_name)
         .all()
     )
 
-    ratios = {}
-
-    for category, total_in, total_out in rows:
-        # Menghitung rasio
-        ratio = (total_out / total_in) if total_in and total_in > 0 else None
-        
-        # MENGATASI MASALAH SPASI/DUPLIKASI (optional: trim spasi jika ada)
-        clean_cat = category.strip() if category else None
-        
-        if clean_cat:
-            ratios[clean_cat] = ratio
-
-    return TurnoverRatioOut(root=ratios)
+    return [
+        {
+            "category": r.category,
+            "restock_count": r.restock_count,
+        }
+        for r in rows
+    ]

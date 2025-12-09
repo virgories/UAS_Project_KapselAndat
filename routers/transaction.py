@@ -6,6 +6,7 @@ from ..dependencies import require_admin
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
+from sqlalchemy import text
 
 @router.post(
     "/",
@@ -24,18 +25,29 @@ def create_transaction(
     return db_transaction
 
 
-@router.get("/", response_model=list[schemas.TransactionOut])
+@router.get(
+    "/",
+    response_model=list[schemas.TransactionOut],
+    response_model_exclude_none=True,   
+)
 def get_all_transactions(db: Session = Depends(get_db)):
-    return db.query(models.Transaction).all()
+    txs = db.query(models.Transaction).all()
+    return [schemas.TransactionOut.model_validate(tx) for tx in txs]
 
-@router.get("/{transaction_id}", response_model=schemas.TransactionOut)
+@router.get(
+    "/{transaction_id}",
+    response_model=schemas.TransactionOut,
+    response_model_exclude_none=True,
+)
 def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
     tx = db.query(models.Transaction).filter(
         models.Transaction.transaction_id == transaction_id
     ).first()
+
     if tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    return tx
+
+    return schemas.TransactionOut.model_validate(tx)
 
 
 @router.put(
